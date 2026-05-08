@@ -1,0 +1,1634 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Spreadsheet Mastery Lab</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'system-ui', 'sans-serif'],
+          mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+        },
+        colors: {
+          ink: { 50:'#f7f7f8',100:'#eeeef0',200:'#d9dadd',300:'#b8bac0',400:'#8b8e96',500:'#62656d',600:'#46484f',700:'#32343a',800:'#1f2126',900:'#141519',950:'#0b0c0f' },
+          accent: { 400:'#7be0a8',500:'#3fc77e',600:'#1fa55f',700:'#157a47' }
+        }
+      }
+    }
+  }
+</script>
+<style>
+  html, body { font-family: 'Inter', system-ui, sans-serif; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  /* Spreadsheet grid look */
+  .sheet { border-collapse: separate; border-spacing: 0; }
+  .sheet th, .sheet td {
+    border-right: 1px solid var(--cell-border);
+    border-bottom: 1px solid var(--cell-border);
+    padding: 6px 10px;
+    white-space: nowrap;
+  }
+  .sheet th { background: var(--head-bg); color: var(--head-fg); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; position: sticky; top: 0; z-index: 1; }
+  .sheet td.row-num, .sheet th.col-corner { background: var(--head-bg); color: var(--head-fg); text-align:center; font-size: 11px; font-weight: 500; width: 36px; min-width: 36px; position: sticky; left: 0; z-index: 2; }
+  .sheet th.col-corner { z-index: 3; }
+  .sheet tr:hover td:not(.row-num) { background: var(--row-hover); }
+  :root {
+    --cell-border: #e6e7ea;
+    --head-bg: #f3f4f6;
+    --head-fg: #4b5563;
+    --row-hover: #fafafa;
+  }
+  .dark {
+    --cell-border: #26282e;
+    --head-bg: #1a1c21;
+    --head-fg: #9ca0aa;
+    --row-hover: #181a1f;
+  }
+  /* ---- column highlight on hover ---- */
+  .sheet col.col-active { background: rgba(63,199,126,.08); }
+  .sheet th.col-active { background: rgba(63,199,126,.18) !important; color: var(--accent-fg, #157a47); cursor: pointer; }
+  .sheet td.col-active { background: rgba(63,199,126,.06); }
+  .dark .sheet th.col-active { color: #7be0a8; }
+  .sheet th[data-col] { cursor: pointer; user-select: none; }
+  .sheet th[data-col]:hover { background: rgba(63,199,126,.12) !important; }
+  .sheet td[data-col-idx]:hover { background: rgba(63,199,126,.05); }
+  .caret { animation: blink 1.1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0 } }
+  /* Subtle scrollbars */
+  .nice-scroll::-webkit-scrollbar { height: 10px; width: 10px; }
+  .nice-scroll::-webkit-scrollbar-thumb { background: rgba(120,120,130,.35); border-radius: 8px; }
+  .nice-scroll::-webkit-scrollbar-track { background: transparent; }
+
+  /* Key cap */
+  .kbd {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    padding: 3px 7px;
+    border-radius: 6px;
+    border: 1px solid var(--cell-border);
+    background: var(--head-bg);
+    color: inherit;
+    box-shadow: 0 1px 0 var(--cell-border);
+    display: inline-block;
+    line-height: 1;
+  }
+
+  .tab-active { background: rgb(255 255 255); color: rgb(20 21 25); }
+  .dark .tab-active { background: rgb(31 33 38); color: rgb(247 247 248); }
+
+  /* Result chip pulse */
+  @keyframes flash { 0% { background-color: rgba(63,199,126,.25);} 100% { background-color: transparent;} }
+  .flash { animation: flash 700ms ease-out; }
+</style>
+</head>
+<body class="bg-ink-50 text-ink-900 dark:bg-ink-950 dark:text-ink-50 antialiased">
+
+<div class="min-h-screen flex flex-col">
+
+  <!-- ===== Top bar ===== -->
+  <header class="border-b border-ink-200/80 dark:border-ink-800/80 bg-white/70 dark:bg-ink-900/60 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-[1400px] mx-auto px-5 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-accent-600 dark:bg-accent-500 grid grid-cols-2 grid-rows-2 gap-[2px] p-[5px]">
+          <span class="bg-white/95 rounded-[1px]"></span>
+          <span class="bg-white/60 rounded-[1px]"></span>
+          <span class="bg-white/60 rounded-[1px]"></span>
+          <span class="bg-white/95 rounded-[1px]"></span>
+        </div>
+        <div class="leading-tight">
+          <div class="font-semibold text-[15px]">Mastery Lab</div>
+          <div class="text-[11px] text-ink-500 dark:text-ink-400">Spreadsheet skills, hands on.</div>
+        </div>
+      </div>
+
+      <nav class="hidden md:flex items-center gap-1 p-1 rounded-lg bg-ink-100 dark:bg-ink-900 border border-ink-200/60 dark:border-ink-800/80">
+        <button data-view="playground" class="view-tab tab-active px-3 py-1.5 rounded-md text-[13px] font-medium">Playground</button>
+        <button data-view="functions" class="view-tab px-3 py-1.5 rounded-md text-[13px] font-medium text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-50">Functions</button>
+        <button data-view="features" class="view-tab px-3 py-1.5 rounded-md text-[13px] font-medium text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-50">Features</button>
+        <button data-view="shortcuts" class="view-tab px-3 py-1.5 rounded-md text-[13px] font-medium text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-50">Shortcuts</button>
+      </nav>
+
+      <div class="flex items-center gap-2">
+        <span class="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-ink-500 dark:text-ink-400 mono">
+          <span class="w-1.5 h-1.5 rounded-full bg-accent-500"></span>
+          24 rows loaded
+        </span>
+        <button id="themeToggle" class="w-9 h-9 grid place-items-center rounded-lg border border-ink-200 dark:border-ink-800 hover:bg-ink-100 dark:hover:bg-ink-900 transition" title="Toggle theme">
+          <svg class="hidden dark:block w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg class="block dark:hidden w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== Main ===== -->
+  <main class="flex-1 max-w-[1400px] w-full mx-auto px-5 py-6">
+
+    <!-- ====== PLAYGROUND ====== -->
+    <section data-view-panel="playground" class="space-y-5">
+
+      <!-- Hero / formula tester -->
+      <div class="rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 overflow-hidden">
+        <div class="px-5 py-4 border-b border-ink-200 dark:border-ink-800 flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h2 class="text-[15px] font-semibold flex items-center gap-2">
+              <span class="text-accent-600 dark:text-accent-400 mono">fx</span>
+              Formula Tester
+            </h2>
+            <p class="text-[12px] text-ink-500 dark:text-ink-400 mt-0.5">Type a formula against the dataset below. Try <span class="mono text-ink-900 dark:text-ink-200">SUM(Total Revenue)</span> or <span class="mono text-ink-900 dark:text-ink-200">AVERAGE(Units Sold)</span>.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="quick-fx text-[12px] px-2.5 py-1 rounded-md border border-ink-200 dark:border-ink-800 hover:bg-ink-100 dark:hover:bg-ink-800 mono" data-formula="SUM(Total Revenue)">SUM</button>
+            <button class="quick-fx text-[12px] px-2.5 py-1 rounded-md border border-ink-200 dark:border-ink-800 hover:bg-ink-100 dark:hover:bg-ink-800 mono" data-formula="AVERAGE(Units Sold)">AVERAGE</button>
+            <button class="quick-fx text-[12px] px-2.5 py-1 rounded-md border border-ink-200 dark:border-ink-800 hover:bg-ink-100 dark:hover:bg-ink-800 mono" data-formula="MAX(Unit Price)">MAX</button>
+            <button class="quick-fx text-[12px] px-2.5 py-1 rounded-md border border-ink-200 dark:border-ink-800 hover:bg-ink-100 dark:hover:bg-ink-800 mono" data-formula="COUNTIF(Category, &quot;Electronics&quot;)">COUNTIF</button>
+          </div>
+        </div>
+
+        <!-- Formula bar -->
+        <div class="px-5 py-4">
+          <div class="flex items-stretch rounded-xl overflow-hidden border border-ink-200 dark:border-ink-800 focus-within:border-accent-500 dark:focus-within:border-accent-500 transition">
+            <div class="px-3 grid place-items-center bg-ink-100 dark:bg-ink-800 border-r border-ink-200 dark:border-ink-800 mono text-[13px] text-ink-500 dark:text-ink-400 italic">fx</div>
+            <span class="grid place-items-center px-3 mono text-accent-600 dark:text-accent-400 font-semibold">=</span>
+            <input id="formulaInput" type="text" autocomplete="off" spellcheck="false"
+              class="flex-1 bg-transparent outline-none mono text-[14px] py-3 pr-3 placeholder-ink-400 dark:placeholder-ink-500"
+              placeholder="SUM(Total Revenue)"
+              value="SUM(Total Revenue)" />
+            <button id="runBtn" class="px-4 bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold tracking-wide">Run ↵</button>
+          </div>
+
+          <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <!-- Result -->
+            <div id="resultCard" class="md:col-span-2 rounded-xl border border-ink-200 dark:border-ink-800 p-4 bg-ink-50/60 dark:bg-ink-950/40">
+              <div class="text-[10px] uppercase tracking-[0.14em] text-ink-500 dark:text-ink-400 font-semibold">Result</div>
+              <div id="resultValue" class="mt-1 text-[28px] font-semibold mono leading-tight">$1,247,820.50</div>
+              <div id="resultMeta" class="text-[12px] text-ink-500 dark:text-ink-400 mt-1">SUM of Total Revenue across 24 rows</div>
+              <!-- Explanation -->
+              <div id="resultExplain" class="mt-3 border-t border-ink-200 dark:border-ink-800 pt-3 space-y-1.5 hidden">
+                <div class="text-[10px] uppercase tracking-[0.14em] text-ink-500 dark:text-ink-400 font-semibold">How it got there</div>
+                <div id="resultExplainBody" class="text-[12.5px] text-ink-700 dark:text-ink-200 leading-relaxed"></div>
+                <div id="resultExplainValues" class="mono text-[11px] text-ink-500 dark:text-ink-400 mt-1 leading-relaxed break-words"></div>
+              </div>
+            </div>
+            <!-- Status -->
+            <div class="rounded-xl border border-ink-200 dark:border-ink-800 p-4">
+              <div class="text-[10px] uppercase tracking-[0.14em] text-ink-500 dark:text-ink-400 font-semibold">Parser trace</div>
+              <div id="parseTrace" class="mt-2 mono text-[11.5px] leading-relaxed text-ink-600 dark:text-ink-300 space-y-1">
+                <!-- filled by JS -->
+              </div>
+            </div>
+          </div>
+
+          <p class="text-[11.5px] text-ink-500 dark:text-ink-400 mt-3">
+            <span class="mono text-ink-700 dark:text-ink-300">Supported live:</span>
+            SUM, AVERAGE, MIN, MAX, COUNT, COUNTA, COUNTIF, SUMIF, AVERAGEIF, MEDIAN, STDEV, VAR, PRODUCT,
+            UNIQUE, SORT, LARGE, SMALL, ROUND, ABS, LEN, UPPER, LOWER, PROPER, TRIM, CONCAT, VLOOKUP, XLOOKUP, MATCH.
+            Reference a column by name — wrap in quotes if it has a space.
+          </p>
+        </div>
+      </div>
+
+      <!-- Sheet -->
+      <div class="rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 overflow-hidden">
+        <div class="px-5 py-3 border-b border-ink-200 dark:border-ink-800 flex items-center justify-between flex-wrap gap-3">
+          <div class="flex items-center gap-2">
+            <div class="w-6 h-6 rounded grid place-items-center bg-accent-600/10 text-accent-700 dark:text-accent-400 mono text-[11px] font-bold">A1</div>
+            <h3 class="text-[14px] font-semibold">Monthly Sales Report — March 2026</h3>
+            <span class="text-[11px] text-ink-500 dark:text-ink-400 mono">/ MonthlySales.json</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <button class="text-[11px] mono px-2 py-1 rounded-md border border-ink-200 dark:border-ink-800 hover:bg-ink-100 dark:hover:bg-ink-800">A → Z</button>
+            <button class="text-[11px] mono px-2 py-1 rounded-md border border-ink-200 dark:border-ink-800 hover:bg-ink-100 dark:hover:bg-ink-800">Filter</button>
+            <button class="text-[11px] mono px-2 py-1 rounded-md border border-ink-200 dark:border-ink-800 hover:bg-ink-100 dark:hover:bg-ink-800">Freeze</button>
+          </div>
+        </div>
+        <div class="overflow-auto nice-scroll max-h-[420px]">
+          <table class="sheet text-[12.5px] mono w-full">
+            <thead>
+              <tr id="sheetHead">
+                <!-- headers injected -->
+              </tr>
+            </thead>
+            <tbody id="sheetBody">
+              <!-- rows injected -->
+            </tbody>
+          </table>
+        </div>
+        <div class="px-5 py-2 border-t border-ink-200 dark:border-ink-800 flex items-center gap-3 text-[11px] text-ink-500 dark:text-ink-400 mono">
+          <span class="px-2 py-0.5 rounded bg-ink-100 dark:bg-ink-800 text-ink-700 dark:text-ink-200">Sheet1</span>
+          <span>+</span>
+          <span class="ml-auto">Ready · 24R × 6C</span>
+        </div>
+      </div>
+
+      <!-- Helpful pair -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div class="rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 p-5">
+          <h3 class="text-[14px] font-semibold flex items-center gap-2">
+            <span class="text-[16px]">👋</span> Hey, before you start
+          </h3>
+          <p class="text-[13px] text-ink-600 dark:text-ink-300 mt-2 leading-relaxed">
+            This is a sandbox — totally safe to experiment in. Type any formula above and watch it run against the dataset in real time.
+            Stuck? Hit a <span class="mono">Try it</span> button on the Functions tab and we'll fill the bar for you.
+          </p>
+          <ul class="mt-3 space-y-1.5 text-[13px] text-ink-600 dark:text-ink-300">
+            <li class="flex gap-2"><span class="text-accent-600 dark:text-accent-400 mono">›</span> Column names are case-sensitive — copy them straight from the table header.</li>
+            <li class="flex gap-2"><span class="text-accent-600 dark:text-accent-400 mono">›</span> Wrap names with spaces in quotes: <span class="mono">SUM("Total Revenue")</span>.</li>
+            <li class="flex gap-2"><span class="text-accent-600 dark:text-accent-400 mono">›</span> Press <kbd class="kbd">↵</kbd> to run, <kbd class="kbd">↑/↓</kbd> for history.</li>
+          </ul>
+        </div>
+
+        <div class="rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 p-5">
+          <h3 class="text-[14px] font-semibold flex items-center gap-2">
+            <span class="text-[16px]">⚡</span> Quick wins to try
+          </h3>
+          <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button class="quick-fx text-left rounded-lg border border-ink-200 dark:border-ink-800 p-3 hover:bg-ink-50 dark:hover:bg-ink-800/60 transition" data-formula='SUMIF(Category, "Electronics")'>
+              <div class="text-[12px] mono text-accent-700 dark:text-accent-400">SUMIF(Category, "Electronics")</div>
+              <div class="text-[11.5px] text-ink-500 dark:text-ink-400 mt-1">Total revenue from one category only.</div>
+            </button>
+            <button class="quick-fx text-left rounded-lg border border-ink-200 dark:border-ink-800 p-3 hover:bg-ink-50 dark:hover:bg-ink-800/60 transition" data-formula="MEDIAN(Unit Price)">
+              <div class="text-[12px] mono text-accent-700 dark:text-accent-400">MEDIAN(Unit Price)</div>
+              <div class="text-[11.5px] text-ink-500 dark:text-ink-400 mt-1">The middle price — less skewed than average.</div>
+            </button>
+            <button class="quick-fx text-left rounded-lg border border-ink-200 dark:border-ink-800 p-3 hover:bg-ink-50 dark:hover:bg-ink-800/60 transition" data-formula="UNIQUE(Product)">
+              <div class="text-[12px] mono text-accent-700 dark:text-accent-400">UNIQUE(Product)</div>
+              <div class="text-[11.5px] text-ink-500 dark:text-ink-400 mt-1">All distinct product names, no dupes.</div>
+            </button>
+            <button class="quick-fx text-left rounded-lg border border-ink-200 dark:border-ink-800 p-3 hover:bg-ink-50 dark:hover:bg-ink-800/60 transition" data-formula="STDEV(Units Sold)">
+              <div class="text-[12px] mono text-accent-700 dark:text-accent-400">STDEV(Units Sold)</div>
+              <div class="text-[11.5px] text-ink-500 dark:text-ink-400 mt-1">How spread out daily sales are.</div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== FUNCTIONS ====== -->
+    <section data-view-panel="functions" class="hidden space-y-5">
+      <div class="rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 p-5">
+        <div class="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h2 class="text-[15px] font-semibold">Functions, in plain English</h2>
+            <p class="text-[12px] text-ink-500 dark:text-ink-400 mt-0.5">The corporate toolkit — searchable, categorized. Hit <span class="mono">Try it</span> to load any formula into the Tester.</p>
+          </div>
+          <div class="relative">
+            <input id="fnSearch" type="text" placeholder="Search 50+ functions…"
+              class="pl-8 pr-3 py-2 rounded-lg border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-950 text-[13px] outline-none focus:border-accent-500 w-64 mono" />
+            <svg class="w-4 h-4 absolute left-2.5 top-2.5 text-ink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          </div>
+        </div>
+        <div id="fnCats" class="mt-4 flex flex-wrap gap-1.5"><!-- category chips injected --></div>
+      </div>
+
+      <div id="fnGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        <!-- cards injected -->
+      </div>
+    </section>
+
+    <!-- ====== FEATURES ====== -->
+    <section data-view-panel="features" class="hidden space-y-5">
+      <div class="rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 p-5">
+        <h2 class="text-[15px] font-semibold">Features every analyst should know</h2>
+        <p class="text-[12px] text-ink-500 dark:text-ink-400 mt-0.5">Beyond formulas — the tools that turn a sheet into a dashboard. Click any card to expand and try a live demo where possible.</p>
+      </div>
+      <div id="featureGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-4"><!-- feature cards injected --></div>
+
+      <!-- Pivot Table live demo -->
+      <div class="rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 overflow-hidden">
+        <div class="px-5 py-4 border-b border-ink-200 dark:border-ink-800 flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h3 class="text-[14px] font-semibold flex items-center gap-2"><span class="text-accent-600 dark:text-accent-400">▦</span> Pivot Table — live demo</h3>
+            <p class="text-[12px] text-ink-500 dark:text-ink-400 mt-0.5">Drag-free version: pick a row field, a value, and how to aggregate. The pivot rebuilds instantly.</p>
+          </div>
+        </div>
+        <div class="p-5 grid grid-cols-1 lg:grid-cols-[260px,1fr] gap-5">
+          <div class="space-y-3">
+            <div>
+              <label class="text-[10px] mono uppercase tracking-[0.14em] text-ink-500 dark:text-ink-400">Rows (group by)</label>
+              <select id="pivotRow" class="mt-1 w-full px-3 py-2 rounded-lg border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-950 text-[13px] mono outline-none focus:border-accent-500">
+                <option>Category</option><option>Product</option><option>Date</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-[10px] mono uppercase tracking-[0.14em] text-ink-500 dark:text-ink-400">Values (number column)</label>
+              <select id="pivotVal" class="mt-1 w-full px-3 py-2 rounded-lg border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-950 text-[13px] mono outline-none focus:border-accent-500">
+                <option>Total Revenue</option><option>Units Sold</option><option>Unit Price</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-[10px] mono uppercase tracking-[0.14em] text-ink-500 dark:text-ink-400">Aggregation</label>
+              <div id="pivotAggs" class="mt-1 inline-flex flex-wrap gap-1 p-1 rounded-lg bg-ink-100 dark:bg-ink-800 border border-ink-200 dark:border-ink-700 w-full">
+                <button data-agg="SUM" class="agg-tab tab-active flex-1 px-3 py-1 rounded-md text-[12px] font-medium">SUM</button>
+                <button data-agg="AVERAGE" class="agg-tab flex-1 px-3 py-1 rounded-md text-[12px] font-medium text-ink-500 dark:text-ink-400">AVG</button>
+                <button data-agg="COUNT" class="agg-tab flex-1 px-3 py-1 rounded-md text-[12px] font-medium text-ink-500 dark:text-ink-400">COUNT</button>
+                <button data-agg="MAX" class="agg-tab flex-1 px-3 py-1 rounded-md text-[12px] font-medium text-ink-500 dark:text-ink-400">MAX</button>
+              </div>
+            </div>
+            <p class="text-[11.5px] text-ink-500 dark:text-ink-400 leading-relaxed">In real Excel: <span class="mono text-ink-700 dark:text-ink-300">Insert › PivotTable</span>, then drag fields into the Rows / Values boxes. Same idea — just visual.</p>
+          </div>
+          <div class="overflow-auto nice-scroll rounded-xl border border-ink-200 dark:border-ink-800 max-h-[360px]">
+            <table class="sheet text-[12.5px] mono w-full">
+              <thead><tr id="pivotHead"></tr></thead>
+              <tbody id="pivotBody"></tbody>
+              <tfoot id="pivotFoot"></tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Conditional Formatting live demo -->
+      <div class="rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 overflow-hidden">
+        <div class="px-5 py-4 border-b border-ink-200 dark:border-ink-800 flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h3 class="text-[14px] font-semibold flex items-center gap-2"><span class="text-accent-600 dark:text-accent-400">◐</span> Conditional Formatting — live demo</h3>
+            <p class="text-[12px] text-ink-500 dark:text-ink-400 mt-0.5">Toggle the rule type. Cells repaint themselves the way Excel would.</p>
+          </div>
+          <div id="cfRules" class="inline-flex p-1 rounded-lg bg-ink-100 dark:bg-ink-800 border border-ink-200 dark:border-ink-700">
+            <button data-rule="heat" class="cf-tab tab-active px-3 py-1 rounded-md text-[12px] font-medium">Heat map</button>
+            <button data-rule="bars" class="cf-tab px-3 py-1 rounded-md text-[12px] font-medium text-ink-500 dark:text-ink-400">Data bars</button>
+            <button data-rule="top3" class="cf-tab px-3 py-1 rounded-md text-[12px] font-medium text-ink-500 dark:text-ink-400">Top 3</button>
+            <button data-rule="above" class="cf-tab px-3 py-1 rounded-md text-[12px] font-medium text-ink-500 dark:text-ink-400">Above avg</button>
+          </div>
+        </div>
+        <div class="overflow-auto nice-scroll max-h-[360px]">
+          <table class="sheet text-[12.5px] mono w-full" id="cfSheet"></table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ====== SHORTCUTS ====== -->
+    <section data-view-panel="shortcuts" class="hidden space-y-5">
+      <div class="rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 p-5 flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 class="text-[15px] font-semibold">Keyboard shortcuts</h2>
+          <p class="text-[12px] text-ink-500 dark:text-ink-400 mt-0.5">The handful that pay for themselves the first day. Pick your platform.</p>
+        </div>
+        <div class="inline-flex p-1 rounded-lg bg-ink-100 dark:bg-ink-800 border border-ink-200 dark:border-ink-700">
+          <button data-os="win" class="os-tab tab-active px-3 py-1 rounded-md text-[12px] font-medium">Windows</button>
+          <button data-os="mac" class="os-tab px-3 py-1 rounded-md text-[12px] font-medium text-ink-500 dark:text-ink-400">Mac</button>
+        </div>
+      </div>
+
+      <div id="scGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <!-- groups injected -->
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="border-t border-ink-200 dark:border-ink-800 mt-6">
+    <div class="max-w-[1400px] mx-auto px-5 py-4 text-[11px] text-ink-500 dark:text-ink-400 mono flex items-center justify-between">
+      <span>Mastery Lab · independent learning sandbox</span>
+      <span>v1.0 · built for tinkering</span>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+/* ============================================================
+   DATASET — Monthly Sales Report (March 2026)
+   ============================================================ */
+const DATA = [
+  { Date:'2026-03-01', Product:'AeroBook 14',     Category:'Electronics', 'Units Sold':12, 'Unit Price':1299.00 },
+  { Date:'2026-03-02', Product:'EchoBuds Pro',    Category:'Electronics', 'Units Sold':45, 'Unit Price':179.50  },
+  { Date:'2026-03-03', Product:'NorthRidge Tee',  Category:'Apparel',     'Units Sold':88, 'Unit Price':28.00   },
+  { Date:'2026-03-04', Product:'Glide Sneaker',   Category:'Apparel',     'Units Sold':22, 'Unit Price':119.00  },
+  { Date:'2026-03-05', Product:'Brewline Kettle', Category:'Home',        'Units Sold':17, 'Unit Price':89.00   },
+  { Date:'2026-03-06', Product:'AeroBook 14',     Category:'Electronics', 'Units Sold':9,  'Unit Price':1299.00 },
+  { Date:'2026-03-07', Product:'Pixel Lamp',      Category:'Home',        'Units Sold':31, 'Unit Price':54.00   },
+  { Date:'2026-03-08', Product:'EchoBuds Pro',    Category:'Electronics', 'Units Sold':52, 'Unit Price':179.50  },
+  { Date:'2026-03-09', Product:'NorthRidge Tee',  Category:'Apparel',     'Units Sold':74, 'Unit Price':28.00   },
+  { Date:'2026-03-10', Product:'Trail Backpack',  Category:'Outdoor',     'Units Sold':19, 'Unit Price':145.00  },
+  { Date:'2026-03-11', Product:'Glide Sneaker',   Category:'Apparel',     'Units Sold':28, 'Unit Price':119.00  },
+  { Date:'2026-03-12', Product:'AeroBook 14',     Category:'Electronics', 'Units Sold':6,  'Unit Price':1299.00 },
+  { Date:'2026-03-13', Product:'Brewline Kettle', Category:'Home',        'Units Sold':23, 'Unit Price':89.00   },
+  { Date:'2026-03-14', Product:'Pixel Lamp',      Category:'Home',        'Units Sold':40, 'Unit Price':54.00   },
+  { Date:'2026-03-15', Product:'Trail Backpack',  Category:'Outdoor',     'Units Sold':14, 'Unit Price':145.00  },
+  { Date:'2026-03-16', Product:'EchoBuds Pro',    Category:'Electronics', 'Units Sold':37, 'Unit Price':179.50  },
+  { Date:'2026-03-17', Product:'NorthRidge Tee',  Category:'Apparel',     'Units Sold':61, 'Unit Price':28.00   },
+  { Date:'2026-03-18', Product:'Summit Tent 2P',  Category:'Outdoor',     'Units Sold':8,  'Unit Price':289.00  },
+  { Date:'2026-03-19', Product:'AeroBook 14',     Category:'Electronics', 'Units Sold':11, 'Unit Price':1299.00 },
+  { Date:'2026-03-20', Product:'Glide Sneaker',   Category:'Apparel',     'Units Sold':35, 'Unit Price':119.00  },
+  { Date:'2026-03-21', Product:'Brewline Kettle', Category:'Home',        'Units Sold':18, 'Unit Price':89.00   },
+  { Date:'2026-03-22', Product:'Trail Backpack',  Category:'Outdoor',     'Units Sold':21, 'Unit Price':145.00  },
+  { Date:'2026-03-23', Product:'Pixel Lamp',      Category:'Home',        'Units Sold':27, 'Unit Price':54.00   },
+  { Date:'2026-03-24', Product:'Summit Tent 2P',  Category:'Outdoor',     'Units Sold':5,  'Unit Price':289.00  },
+];
+// derive Total Revenue
+DATA.forEach(r => r['Total Revenue'] = +(r['Units Sold'] * r['Unit Price']).toFixed(2));
+
+const COLUMNS = ['Date','Product','Category','Units Sold','Unit Price','Total Revenue'];
+const NUMERIC = new Set(['Units Sold','Unit Price','Total Revenue']);
+
+/* ============================================================
+   SHEET RENDER
+   ============================================================ */
+function renderSheet(){
+  const head = document.getElementById('sheetHead');
+  head.innerHTML = '<th class="col-corner"></th>' + COLUMNS.map((c,i) =>
+    `<th data-col="${c}" data-col-idx="${i}" title="Click to insert '${c}' into formula bar">${String.fromCharCode(65+i)} · ${c}</th>`).join('');
+  const body = document.getElementById('sheetBody');
+  body.innerHTML = DATA.map((row, idx) => {
+    const cells = COLUMNS.map((c,ci) => {
+      let v = row[c];
+      if (c === 'Unit Price' || c === 'Total Revenue') v = '$' + v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+      const align = NUMERIC.has(c) ? 'text-right' : '';
+      return `<td class="${align}" data-col-idx="${ci}" data-col="${c}">${v}</td>`;
+    }).join('');
+    return `<tr><td class="row-num">${idx+2}</td>${cells}</tr>`;
+  }).join('');
+
+  /* ---- column hover highlight ---- */
+  const sheetEl = head.closest('table');
+  let hoverCol = -1;
+  function setColHighlight(idx, on){
+    sheetEl.querySelectorAll(`[data-col-idx="${idx}"]`).forEach(el => el.classList.toggle('col-active', on));
+  }
+  sheetEl.addEventListener('mouseover', e => {
+    const el = e.target.closest('[data-col-idx]');
+    if (!el) return;
+    const idx = +el.dataset.colIdx;
+    if (idx !== hoverCol){ setColHighlight(hoverCol, false); hoverCol = idx; setColHighlight(idx, true); }
+  });
+  sheetEl.addEventListener('mouseleave', () => { setColHighlight(hoverCol, false); hoverCol = -1; });
+
+  /* ---- click header/cell → insert column name ---- */
+  sheetEl.addEventListener('click', e => {
+    const el = e.target.closest('[data-col]');
+    if (!el || !el.dataset.col) return;
+    const col = el.dataset.col;
+    const inp = document.getElementById('formulaInput');
+    const val = inp.value;
+    // If the input already contains a partial/complete formula with an opening paren, insert col name
+    const openParen = val.lastIndexOf('(');
+    if (openParen !== -1 && !val.includes(')', openParen)){
+      // Insert at end, replacing any partially typed column name after (
+      const before = val.slice(0, openParen+1);
+      inp.value = before + col;
+    } else {
+      // No open paren — wrap with a tooltip chip flash then set to SUM(col)
+      inp.value = `SUM(${col})`;
+    }
+    inp.focus();
+    // Flash the input border green
+    inp.classList.add('ring-2','ring-accent-500');
+    setTimeout(() => inp.classList.remove('ring-2','ring-accent-500'), 700);
+    run();
+  });
+}
+
+/* ============================================================
+   EXPLANATION ENGINE
+   ============================================================ */
+function fmtNum(n){ return n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtVal(v){ return typeof v === 'number' ? fmtNum(v) : String(v); }
+
+function buildExplain(fn, args, result){
+  try {
+    // helpers
+    const col1 = args[0] ? pickColumn(args[0]) : null;
+    const vals  = col1 ? numVals(col1) : [];
+    const cvals = col1 ? colVals(col1) : [];
+    const SHOW  = 5; // sample size for inline value lists
+
+    const valSample = (arr, fmt=fmtVal) => {
+      const s = arr.slice(0,SHOW).map(fmt).join(' + ');
+      return arr.length > SHOW ? `${s} + … (${arr.length} total)` : s;
+    };
+
+    switch(fn){
+      case 'SUM': {
+        const total = vals.reduce((a,b)=>a+b,0);
+        const top   = DATA.slice().sort((a,b) => b[col1]-a[col1])[0];
+        return {
+          body: `Excel scans all ${vals.length} rows in <b>${col1}</b>, adds every number together, and gives you the grand total.`,
+          values: `Values (sample): ${valSample(vals, fmtNum)} = <b>${fmtNum(total)}</b>`
+        };
+      }
+      case 'AVERAGE': {
+        const total = vals.reduce((a,b)=>a+b,0);
+        return {
+          body: `Excel adds all ${vals.length} values in <b>${col1}</b> to get <b>${fmtNum(total)}</b>, then divides by ${vals.length} rows.`,
+          values: `${fmtNum(total)} ÷ ${vals.length} = <b>${fmtNum(total/vals.length)}</b>`
+        };
+      }
+      case 'MIN': {
+        const m = Math.min(...vals);
+        const row = DATA.find(r => r[col1] === m);
+        return {
+          body: `Excel compares every value in <b>${col1}</b> and tracks the smallest it sees.`,
+          values: `Smallest found: <b>${fmtNum(m)}</b>${row ? ` — in row "${row.Product || Object.values(row)[1]}"` : ''}`
+        };
+      }
+      case 'MAX': {
+        const m = Math.max(...vals);
+        const row = DATA.find(r => r[col1] === m);
+        return {
+          body: `Excel scans all ${vals.length} values in <b>${col1}</b> and keeps the largest it encounters.`,
+          values: `Largest found: <b>${fmtNum(m)}</b>${row ? ` — in row "${row.Product || Object.values(row)[1]}"` : ''}`
+        };
+      }
+      case 'COUNT':  return { body: `Excel walks <b>${col1}</b> and counts only the cells that contain a number. Text and blanks are skipped.`, values: `${vals.length} numeric values found out of ${DATA.length} rows` };
+      case 'COUNTA': return { body: `Excel counts every non-empty cell in <b>${col1}</b> — numbers, text, dates, anything.`, values: `${cvals.length} non-empty cells out of ${DATA.length} rows` };
+      case 'MEDIAN': {
+        const sorted = vals.slice().sort((a,b)=>a-b);
+        const mid = Math.floor(sorted.length/2);
+        const isEven = sorted.length % 2 === 0;
+        return {
+          body: `Excel sorts all ${vals.length} values in <b>${col1}</b>, then picks the middle one${isEven ? ' (average of the two center values)' : ''}.`,
+          values: `Sorted: ${sorted.slice(0,3).map(fmtNum).join(', ')} … ${sorted.slice(-2).map(fmtNum).join(', ')} → middle = <b>${fmtNum(Array.isArray(result)?result[0]:result)}</b>`
+        };
+      }
+      case 'STDEV': {
+        const mean = vals.reduce((a,b)=>a+b,0)/vals.length;
+        return {
+          body: `Excel calculates the mean of <b>${col1}</b> (${fmtNum(mean)}), measures how far each value strays from it, squares those distances, averages them, then takes the square root.`,
+          values: `Mean: ${fmtNum(mean)} · STDEV: <b>${fmtNum(result)}</b> — about ${Math.round(result/mean*100)}% of the average`
+        };
+      }
+      case 'VAR': {
+        const mean = vals.reduce((a,b)=>a+b,0)/vals.length;
+        return {
+          body: `Variance is STDEV squared. Excel measures average squared distance from the mean of <b>${col1}</b>.`,
+          values: `Mean: ${fmtNum(mean)} · VAR: <b>${fmtNum(result)}</b>`
+        };
+      }
+      case 'COUNTIF': {
+        const crit = unquote(args[1]||'');
+        const matched = DATA.filter(r => matchCrit(r[col1], crit));
+        const names = matched.slice(0,4).map(r=>r.Product||String(Object.values(r)[1])).join(', ');
+        return {
+          body: `Excel checks each of the ${DATA.length} rows in <b>${col1}</b> against the rule <b>"${crit}"</b> and counts the hits.`,
+          values: `${matched.length} rows matched${names ? ` — e.g. ${names}${matched.length>4?' …':''}` : ''}`
+        };
+      }
+      case 'SUMIF': {
+        const crit = unquote(args[1]||'');
+        const tCol = args[2] ? pickColumn(args[2]) : 'Total Revenue';
+        const matched = DATA.filter(r => matchCrit(r[col1], crit));
+        const subtotals = matched.map(r=>r[tCol]||0);
+        return {
+          body: `Excel first finds every row where <b>${col1}</b> matches <b>"${crit}"</b> (${matched.length} rows), then adds up their <b>${tCol}</b> values.`,
+          values: `Matching rows: ${matched.length} · Values (sample): ${valSample(subtotals, fmtNum)} = <b>${fmtNum(subtotals.reduce((a,b)=>a+b,0))}</b>`
+        };
+      }
+      case 'AVERAGEIF': {
+        const crit = unquote(args[1]||'');
+        const tCol = args[2] ? pickColumn(args[2]) : 'Total Revenue';
+        const matched = DATA.filter(r => matchCrit(r[col1], crit));
+        const subtotals = matched.map(r=>Number(r[tCol])||0);
+        const sum = subtotals.reduce((a,b)=>a+b,0);
+        return {
+          body: `Excel finds the ${matched.length} rows where <b>${col1}</b> = <b>"${crit}"</b>, sums their <b>${tCol}</b> (${fmtNum(sum)}), then divides by ${matched.length}.`,
+          values: `${fmtNum(sum)} ÷ ${matched.length} = <b>${fmtNum(sum/matched.length)}</b>`
+        };
+      }
+      case 'UNIQUE': {
+        const uniq = [...new Set(cvals)];
+        return {
+          body: `Excel scans all ${cvals.length} values in <b>${col1}</b>, removes every duplicate, and returns the ${uniq.length} distinct values.`,
+          values: uniq.join(' · ')
+        };
+      }
+      case 'SORT': {
+        const sorted = Array.isArray(result) ? result : [];
+        return {
+          body: `Excel reads all values from <b>${col1}</b> and returns them sorted from smallest to largest (or A → Z for text).`,
+          values: `First 5: ${sorted.slice(0,5).map(fmtVal).join(', ')} …`
+        };
+      }
+      case 'LARGE':
+      case 'SMALL': {
+        const k = +(args[1]||1);
+        return {
+          body: `Excel sorts all values in <b>${col1}</b> and picks the #${k} ${fn==='LARGE'?'largest':'smallest'} one.`,
+          values: `k = ${k} → result = <b>${fmtVal(result)}</b>`
+        };
+      }
+      case 'VLOOKUP':
+      case 'HLOOKUP':
+      case 'XLOOKUP': {
+        const lv = unquote(args[0]||'');
+        return {
+          body: `Excel scans down <b>${args[1]}</b> looking for <b>"${lv}"</b>. When it finds the row, it returns the value from <b>${args[2]}</b>.`,
+          values: result === '#N/A' ? `"${lv}" was not found in the column.` : `Match found → <b>${fmtVal(result)}</b>`
+        };
+      }
+      case 'MATCH': {
+        const lv = unquote(args[0]||'');
+        return {
+          body: `Excel scans <b>${args[1]}</b> top-to-bottom and returns the row number where <b>"${lv}"</b> first appears.`,
+          values: result === '#N/A' ? `"${lv}" was not found.` : `Found at position <b>${result}</b> (1-indexed)`
+        };
+      }
+      case 'INDEX': {
+        return {
+          body: `Excel goes to row <b>${args[1]}</b> in <b>${col1}</b> and returns whatever is there.`,
+          values: `Row ${args[1]} → <b>${fmtVal(result)}</b>`
+        };
+      }
+      case 'TODAY': return { body: "Returns today's date as a serial number Excel can use in date math.", values: `Today = <b>${result}</b>` };
+      case 'NOW':   return { body: "Returns right now as a date+time serial. Re-calculates every time the sheet refreshes.", values: `Now = <b>${result}</b>` };
+      case 'YEAR':  return { body: `Extracts the 4-digit year from the date value.`, values: `Result: <b>${result}</b>` };
+      case 'MONTH': return { body: `Extracts the month number (1–12) from the date value.`, values: `Result: <b>${result}</b>` };
+      case 'DAY':   return { body: `Extracts the day-of-month (1–31) from the date value.`, values: `Result: <b>${result}</b>` };
+      case 'ROUND': return { body: `Rounds the number to ${args[1]||0} decimal places using standard rounding rules (≥0.5 rounds up).`, values: `${args[0]} rounded to ${args[1]||0} decimals = <b>${result}</b>` };
+      case 'ABS':   return { body: `Strips the sign off the number, returning the distance from zero.`, values: `|${args[0]}| = <b>${result}</b>` };
+      case 'SQRT':  return { body: `Returns the square root. Only works for non-negative numbers.`, values: `√${args[0]} = <b>${result}</b>` };
+      case 'LEN': {
+        const lens = Array.isArray(result) ? result : [result];
+        return { body: `LEN counts every character in the string, including spaces.`, values: `Sample lengths from <b>${col1}</b>: ${lens.join(', ')}` };
+      }
+      case 'UPPER': case 'LOWER': case 'PROPER': case 'TRIM': {
+        const out = Array.isArray(result) ? result : [result];
+        return { body: `Applied to the first 5 values in <b>${col1}</b>.`, values: out.join(' · ') };
+      }
+      case 'CONCAT': {
+        return { body: `Joins the first 5 values of <b>${col1}</b> using the separator you provided.`, values: `Result: <b>${result}</b>` };
+      }
+      case 'LEFT': case 'RIGHT': {
+        const out = Array.isArray(result) ? result : [result];
+        return { body: `Extracted ${args[1]||1} character(s) from each of the first 5 values in <b>${col1}</b>.`, values: out.join(' · ') };
+      }
+      default: return null;
+    }
+  } catch(_){ return null; }
+}
+
+/* ============================================================
+   FORMULA PARSER
+   ============================================================ */
+function pickColumn(name){
+  // strip optional quotes
+  name = name.trim().replace(/^["']|["']$/g,'');
+  if (COLUMNS.includes(name)) return name;
+  // case-insensitive fallback
+  const m = COLUMNS.find(c => c.toLowerCase() === name.toLowerCase());
+  return m || null;
+}
+
+function colVals(col){
+  return DATA.map(r => r[col]).filter(v => v !== undefined && v !== null && v !== '');
+}
+function numVals(col){
+  return colVals(col).map(Number).filter(v => !Number.isNaN(v));
+}
+
+const FUNCS = {
+  // --- Aggregates ---
+  SUM:    (col)=> numVals(col).reduce((a,b)=>a+b,0),
+  AVERAGE:(col)=> { const v=numVals(col); return v.length? v.reduce((a,b)=>a+b,0)/v.length : 0; },
+  MIN:    (col)=> Math.min(...numVals(col)),
+  MAX:    (col)=> Math.max(...numVals(col)),
+  COUNT:  (col)=> numVals(col).length,
+  COUNTA: (col)=> colVals(col).length,
+  PRODUCT:(col)=> numVals(col).reduce((a,b)=>a*b,1),
+  MEDIAN: (col)=> {
+    const v=numVals(col).slice().sort((a,b)=>a-b); if(!v.length) return 0;
+    const mid=Math.floor(v.length/2);
+    return v.length%2? v[mid] : (v[mid-1]+v[mid])/2;
+  },
+  STDEV:  (col)=> {
+    const v=numVals(col); if(v.length<2) return 0;
+    const m=v.reduce((a,b)=>a+b,0)/v.length;
+    const sq=v.reduce((a,b)=>a+(b-m)**2,0)/(v.length-1);
+    return Math.sqrt(sq);
+  },
+  VAR:    (col)=> {
+    const v=numVals(col); if(v.length<2) return 0;
+    const m=v.reduce((a,b)=>a+b,0)/v.length;
+    return v.reduce((a,b)=>a+(b-m)**2,0)/(v.length-1);
+  },
+  // --- Conditional aggregates ---
+  COUNTIF:(col, crit)=> colVals(col).filter(v => matchCrit(v, crit)).length,
+  SUMIF:  (col, crit, sumCol)=> {
+    const target = sumCol || 'Total Revenue';
+    return DATA.filter(r => matchCrit(r[col], crit))
+               .reduce((a,r)=> a + (Number(r[target])||0), 0);
+  },
+  AVERAGEIF:(col, crit, avgCol)=> {
+    const target = avgCol || 'Total Revenue';
+    const rows = DATA.filter(r => matchCrit(r[col], crit));
+    if (!rows.length) return 0;
+    return rows.reduce((a,r)=> a + (Number(r[target])||0), 0) / rows.length;
+  },
+  // --- Array / set ---
+  UNIQUE: (col)=> [...new Set(colVals(col))],
+  SORT:   (col)=> {
+    const v = colVals(col).slice();
+    const allNum = v.every(x => !isNaN(Number(x)));
+    return allNum ? v.map(Number).sort((a,b)=>a-b) : v.sort();
+  },
+  LARGE:  (col, k)=> { const v=numVals(col).slice().sort((a,b)=>b-a); return v[(+k||1)-1]; },
+  SMALL:  (col, k)=> { const v=numVals(col).slice().sort((a,b)=>a-b); return v[(+k||1)-1]; },
+  RANK:   (val, col)=> { const v=numVals(col).slice().sort((a,b)=>b-a); return v.indexOf(Number(val))+1; },
+  // --- Lookups ---
+  VLOOKUP:(lookup, col, returnCol)=> {
+    const c1 = pickColumn(col); const c2 = pickColumn(returnCol);
+    if (!c1 || !c2) throw new Error("VLOOKUP needs two valid column names.");
+    const row = DATA.find(r => String(r[c1]) === String(unquote(lookup)));
+    return row ? row[c2] : '#N/A';
+  },
+  XLOOKUP:(lookup, col, returnCol)=> FUNCS.VLOOKUP(lookup, col, returnCol),
+  HLOOKUP:(lookup, col, returnCol)=> FUNCS.VLOOKUP(lookup, col, returnCol),
+  MATCH:  (lookup, col)=> {
+    const c = pickColumn(col); if (!c) throw new Error("MATCH needs a valid column.");
+    const i = colVals(c).findIndex(v => String(v) === String(unquote(lookup)));
+    return i < 0 ? '#N/A' : i + 1;
+  },
+  INDEX:  (col, n)=> { const c = pickColumn(col); if (!c) throw new Error("INDEX needs a column."); const v=colVals(c); return v[(+n||1)-1] ?? '#REF!'; },
+  // --- Text (operate on a single column, return a sample of first 5) ---
+  CONCAT: (col, sep)=> {
+    const c = pickColumn(col); if (!c) throw new Error("CONCAT needs a column.");
+    return colVals(c).slice(0,5).join(unquote(sep||', '));
+  },
+  UPPER:  (col)=> colVals(pickColumn(col)).slice(0,5).map(v=>String(v).toUpperCase()),
+  LOWER:  (col)=> colVals(pickColumn(col)).slice(0,5).map(v=>String(v).toLowerCase()),
+  PROPER: (col)=> colVals(pickColumn(col)).slice(0,5).map(v=>String(v).replace(/\b\w/g, c=>c.toUpperCase())),
+  TRIM:   (col)=> colVals(pickColumn(col)).slice(0,5).map(v=>String(v).trim()),
+  LEN:    (col)=> { const c=pickColumn(col); if(!c) throw new Error("LEN needs a column."); return colVals(c).slice(0,5).map(v=>String(v).length); },
+  LEFT:   (col, n)=> colVals(pickColumn(col)).slice(0,5).map(v=>String(v).slice(0, +n||1)),
+  RIGHT:  (col, n)=> colVals(pickColumn(col)).slice(0,5).map(v=>String(v).slice(-(+n||1))),
+  // --- Math (single value funcs accept either a number or a column's first value) ---
+  ROUND:  (val, digits)=> { const n = numFromArg(val); const d = +digits||0; const f=10**d; return Math.round(n*f)/f; },
+  ABS:    (val)=> Math.abs(numFromArg(val)),
+  INT:    (val)=> Math.floor(numFromArg(val)),
+  MOD:    (a,b)=> numFromArg(a) % numFromArg(b),
+  POWER:  (a,b)=> Math.pow(numFromArg(a), numFromArg(b)),
+  SQRT:   (val)=> Math.sqrt(numFromArg(val)),
+  // --- Date helpers ---
+  TODAY:  ()=> new Date().toISOString().slice(0,10),
+  NOW:    ()=> new Date().toISOString().replace('T',' ').slice(0,16),
+  YEAR:   (val)=> new Date(unquote(val)).getFullYear(),
+  MONTH:  (val)=> new Date(unquote(val)).getMonth()+1,
+  DAY:    (val)=> new Date(unquote(val)).getDate(),
+};
+
+// Match a value against a criterion that may be plain ("Electronics"), or an Excel-style
+// comparator string (">100", "<=50", "<>Apparel"). Numeric comparisons get auto-numeric.
+function matchCrit(value, crit){
+  const c = unquote(String(crit||'')).trim();
+  const m = c.match(/^(>=|<=|<>|>|<|=)\s*(.+)$/);
+  if (!m) return String(value) === c;
+  const op = m[1]; const target = m[2].trim();
+  const numV = Number(value), numT = Number(target);
+  const numeric = !isNaN(numV) && !isNaN(numT);
+  switch(op){
+    case '=':  return numeric ? numV === numT : String(value) === target;
+    case '<>': return numeric ? numV !== numT : String(value) !== target;
+    case '>':  return numeric ? numV >  numT : String(value) >  target;
+    case '<':  return numeric ? numV <  numT : String(value) <  target;
+    case '>=': return numeric ? numV >= numT : String(value) >= target;
+    case '<=': return numeric ? numV <= numT : String(value) <= target;
+  }
+  return false;
+}
+function numFromArg(arg){
+  const s = unquote(String(arg||'')).trim();
+  if (!isNaN(Number(s))) return Number(s);
+  // try column → first numeric value
+  const c = pickColumn(s);
+  if (c){ const v = numVals(c); if (v.length) return v[0]; }
+  throw new Error(`Couldn't parse "${arg}" as a number or column.`);
+}
+
+/** Split args respecting quoted strings */
+function splitArgs(s){
+  const out = []; let buf=''; let q=null;
+  for (const ch of s){
+    if (q){
+      if (ch === q){ q=null; buf+=ch; continue; }
+      buf+=ch; continue;
+    }
+    if (ch === '"' || ch === "'"){ q=ch; buf+=ch; continue; }
+    if (ch === ','){ out.push(buf.trim()); buf=''; continue; }
+    buf+=ch;
+  }
+  if (buf.trim().length) out.push(buf.trim());
+  return out;
+}
+
+function unquote(s){ return s.replace(/^["']|["']$/g,''); }
+
+function parseFormula(input){
+  let raw = input.trim();
+  if (raw.startsWith('=')) raw = raw.slice(1).trim();
+  const m = raw.match(/^([A-Za-z]+)\s*\(([\s\S]*)\)\s*$/);
+  if (!m) return { ok:false, error:"Hmm, I can't read that. Try FN(column) — e.g. SUM(Total Revenue)." };
+  const fn = m[1].toUpperCase();
+  if (!FUNCS[fn]) return { ok:false, error:`Function ${fn} isn't supported yet. Try one of: ${Object.keys(FUNCS).join(', ')}.` };
+  const args = m[2].trim() ? splitArgs(m[2]) : [];
+  return { ok:true, fn, args, raw };
+}
+
+// Function classes for routing
+const NO_ARG    = new Set(['TODAY','NOW']);
+const SCALAR    = new Set(['ROUND','ABS','INT','MOD','POWER','SQRT','YEAR','MONTH','DAY']);
+const COND_AGG  = new Set(['COUNTIF','SUMIF','AVERAGEIF']);
+const LOOKUP    = new Set(['VLOOKUP','XLOOKUP','HLOOKUP']);
+const POSITIONAL= new Set(['MATCH','INDEX','LARGE','SMALL','RANK','LEFT','RIGHT','CONCAT']);
+
+function evaluate(input){
+  const p = parseFormula(input);
+  const trace = [];
+  if (!p.ok) return { ok:false, error:p.error, trace:[`✗ ${p.error}`] };
+  trace.push(`▸ matched function   → ${p.fn}`);
+  trace.push(`▸ raw arguments      → [${p.args.join(' | ')}]`);
+
+  let result, meta;
+  try {
+    if (NO_ARG.has(p.fn)){
+      result = FUNCS[p.fn]();
+      meta = `${p.fn}() — current system value`;
+    } else if (SCALAR.has(p.fn)){
+      result = FUNCS[p.fn](...p.args);
+      meta = `${p.fn} on ${p.args.join(', ')}`;
+    } else if (COND_AGG.has(p.fn)){
+      const col = pickColumn(p.args[0]); const crit = unquote(p.args[1]||'');
+      if (!col) throw new Error(`Column "${p.args[0]}" not found.`);
+      const target = p.args[2] ? pickColumn(p.args[2]) : null;
+      trace.push(`▸ resolved column    → ${col}`);
+      trace.push(`▸ criterion          → "${crit}"`);
+      if (target) trace.push(`▸ value column       → ${target}`);
+      result = FUNCS[p.fn](col, crit, target);
+      meta = p.fn === 'COUNTIF'
+        ? `Rows in ${col} matching "${crit}"`
+        : `${p.fn === 'SUMIF' ? 'Sum' : 'Average'} of ${target||'Total Revenue'} where ${col} = "${crit}"`;
+    } else if (LOOKUP.has(p.fn)){
+      // VLOOKUP("AeroBook 14", Product, "Total Revenue")
+      const c1 = pickColumn(p.args[1]); const c2 = pickColumn(p.args[2]);
+      if (!c1 || !c2) throw new Error("Lookup needs: lookup value, search column, return column.");
+      trace.push(`▸ search column      → ${c1}`);
+      trace.push(`▸ return column      → ${c2}`);
+      result = FUNCS[p.fn](p.args[0], c1, c2);
+      meta = `${p.fn}: find "${unquote(p.args[0])}" in ${c1}, return ${c2}`;
+    } else if (p.fn === 'MATCH'){
+      const c = pickColumn(p.args[1]); if (!c) throw new Error("MATCH needs a column.");
+      trace.push(`▸ search column      → ${c}`);
+      result = FUNCS.MATCH(p.args[0], c);
+      meta = `Position of "${unquote(p.args[0])}" inside ${c}`;
+    } else if (p.fn === 'INDEX'){
+      const c = pickColumn(p.args[0]); if (!c) throw new Error("INDEX needs a column.");
+      result = FUNCS.INDEX(c, p.args[1]);
+      meta = `Row ${p.args[1]} of ${c}`;
+    } else if (p.fn === 'LARGE' || p.fn === 'SMALL'){
+      const c = pickColumn(p.args[0]); if (!c) throw new Error(`${p.fn} needs a column.`);
+      result = FUNCS[p.fn](c, p.args[1]);
+      meta = `${p.fn === 'LARGE' ? 'kth largest' : 'kth smallest'} (k=${p.args[1]||1}) of ${c}`;
+    } else if (p.fn === 'CONCAT'){
+      const c = pickColumn(p.args[0]); if (!c) throw new Error("CONCAT needs a column.");
+      result = FUNCS.CONCAT(c, p.args[1]);
+      meta = `First 5 of ${c} joined by "${unquote(p.args[1]||', ')}"`;
+    } else if (p.fn === 'LEFT' || p.fn === 'RIGHT'){
+      const c = pickColumn(p.args[0]); if (!c) throw new Error(`${p.fn} needs a column.`);
+      result = FUNCS[p.fn](c, p.args[1]);
+      meta = `${p.fn === 'LEFT' ? 'First' : 'Last'} ${p.args[1]||1} chars from ${c} (sample of 5)`;
+    } else {
+      // Single-column aggregates / text-on-column
+      const col = pickColumn(p.args[0]);
+      if (!col) throw new Error(`Column "${p.args[0]}" not found.`);
+      trace.push(`▸ resolved column    → ${col}`);
+      trace.push(`▸ rows scanned       → ${DATA.length}`);
+      result = FUNCS[p.fn](col);
+      meta = `${p.fn} of ${col} across ${DATA.length} rows`;
+    }
+  } catch(e){
+    return { ok:false, error:e.message, trace:[...trace, `✗ ${e.message}`] };
+  }
+  trace.push(`✓ done`);
+  return { ok:true, fn:p.fn, result, meta, trace, explain: buildExplain(p.fn, p.args, result) };
+}
+
+function formatResult(r, fn){
+  if (Array.isArray(r)) return r.join(', ');
+  if (typeof r !== 'number') return String(r);
+  if (fn === 'COUNT' || fn === 'COUNTA' || fn === 'COUNTIF') return r.toLocaleString();
+  // currency-ish for sum/avg/sumif/median when value is large or fractional
+  if (Math.abs(r) >= 100 || !Number.isInteger(r)){
+    return r.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
+  return r.toString();
+}
+
+/* ============================================================
+   FORMULA UI WIRING
+   ============================================================ */
+const formulaInput = document.getElementById('formulaInput');
+const resultValue  = document.getElementById('resultValue');
+const resultMeta   = document.getElementById('resultMeta');
+const resultCard   = document.getElementById('resultCard');
+const parseTrace   = document.getElementById('parseTrace');
+const resultExplain     = document.getElementById('resultExplain');
+const resultExplainBody  = document.getElementById('resultExplainBody');
+const resultExplainVals  = document.getElementById('resultExplainValues');
+
+const HISTORY = [];
+let histIdx = -1;
+
+const CURRENCY_FNS = new Set(['SUM','SUMIF','AVERAGEIF','MEDIAN','STDEV','AVERAGE','MAX','MIN']);
+
+function run(){
+  const input = formulaInput.value;
+  if (!input.trim()){ return; }
+  const out = evaluate(input);
+  if (out.ok){
+    const isCurrency = CURRENCY_FNS.has(out.fn) && typeof out.result === 'number';
+    const isCount = ['COUNT','COUNTA','COUNTIF'].includes(out.fn);
+    const isNoPrefix = ['UNIQUE','SORT','LEFT','RIGHT','UPPER','LOWER','PROPER','TRIM','LEN','CONCAT','MATCH','INDEX','VLOOKUP','XLOOKUP','HLOOKUP','TODAY','NOW','YEAR','MONTH','DAY'].includes(out.fn);
+    const prefix = isCurrency ? '$' : '';
+    resultValue.textContent = prefix + formatResult(out.result, out.fn);
+    resultValue.className = 'mt-1 text-[28px] font-semibold mono leading-tight text-ink-900 dark:text-ink-50';
+    resultMeta.textContent = out.meta;
+    resultMeta.className = 'text-[12px] text-ink-500 dark:text-ink-400 mt-1';
+
+    if (out.explain){
+      resultExplain.classList.remove('hidden');
+      resultExplainBody.innerHTML = out.explain.body;
+      resultExplainVals.innerHTML = out.explain.values || '';
+    } else {
+      resultExplain.classList.add('hidden');
+    }
+  } else {
+    resultValue.textContent = '#ERROR';
+    resultValue.className = 'mt-1 text-[28px] font-semibold mono leading-tight text-rose-500';
+    resultMeta.textContent = out.error;
+    resultMeta.className = 'text-[12px] text-rose-500 dark:text-rose-400 mt-1';
+    resultExplain.classList.add('hidden');
+  }
+  parseTrace.innerHTML = out.trace.map(l => `<div>${l.replace(/^✓/,'<span class="text-accent-600 dark:text-accent-400">✓</span>').replace(/^✗/,'<span class="text-rose-500">✗</span>').replace(/^▸/,'<span class="text-ink-400">▸</span>')}</div>`).join('');
+  resultCard.classList.remove('flash'); void resultCard.offsetWidth; resultCard.classList.add('flash');
+
+  if (HISTORY[HISTORY.length-1] !== input) HISTORY.push(input);
+  histIdx = HISTORY.length;
+}
+
+formulaInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter'){ e.preventDefault(); run(); }
+  else if (e.key === 'ArrowUp'){
+    if (HISTORY.length){ histIdx = Math.max(0, histIdx-1); formulaInput.value = HISTORY[histIdx] || ''; }
+  } else if (e.key === 'ArrowDown'){
+    if (HISTORY.length){ histIdx = Math.min(HISTORY.length, histIdx+1); formulaInput.value = HISTORY[histIdx] || ''; }
+  }
+});
+document.getElementById('runBtn').addEventListener('click', run);
+
+document.querySelectorAll('.quick-fx').forEach(b => {
+  b.addEventListener('click', () => {
+    formulaInput.value = b.dataset.formula;
+    setView('playground');
+    formulaInput.focus();
+    run();
+    formulaInput.scrollIntoView({block:'nearest'});
+  });
+});
+
+/* ============================================================
+   FUNCTIONS LIBRARY
+   ============================================================ */
+const LIBRARY = [
+  // ===== AGGREGATE / MATH =====
+  { cat:'Aggregate', name:'SUM',     friendly:"Adds everything in a column. The workhorse of any sales report.", example:'SUM(Total Revenue)' },
+  { cat:'Aggregate', name:'AVERAGE', friendly:"What's typical? AVERAGE gives you the middle of the pack.", example:'AVERAGE(Units Sold)' },
+  { cat:'Aggregate', name:'MIN',     friendly:"Smallest number in the bunch. Great for finding the bargain price.", example:'MIN(Unit Price)' },
+  { cat:'Aggregate', name:'MAX',     friendly:"Largest number. Useful for spotting your top-priced item.", example:'MAX(Unit Price)' },
+  { cat:'Aggregate', name:'COUNT',   friendly:"Counts only the cells that hold numbers. Skips text.", example:'COUNT(Units Sold)' },
+  { cat:'Aggregate', name:'COUNTA',  friendly:"Counts ANY non-empty cell — text, numbers, dates, all of it.", example:'COUNTA(Product)' },
+  { cat:'Aggregate', name:'PRODUCT', friendly:"Multiplies all the numbers together. Niche but lifesaving for compounded rates.", example:'PRODUCT(Units Sold)' },
+  { cat:'Aggregate', name:'MEDIAN',  friendly:"The 'middle' value. Less affected by one weird outlier than AVERAGE.", example:'MEDIAN(Unit Price)' },
+  { cat:'Aggregate', name:'STDEV',   friendly:"How spread out the numbers are. Big number = volatile data.", example:'STDEV(Units Sold)' },
+  { cat:'Aggregate', name:'VAR',     friendly:"Variance — STDEV's nerdy sibling. Squared distance from the mean.", example:'VAR(Units Sold)' },
+  { cat:'Aggregate', name:'LARGE',   friendly:"The k-th largest value — pass 1 for the biggest, 2 for runner-up, and so on.", example:'LARGE(Total Revenue, 3)' },
+  { cat:'Aggregate', name:'SMALL',   friendly:"The k-th smallest. Useful for 'bottom three' style analysis.", example:'SMALL(Units Sold, 2)' },
+  { cat:'Aggregate', name:'RANK',    friendly:"Finds where a number ranks within a column. 1st place, 5th place, etc.", example:'RANK(45, Units Sold)' },
+
+  // ===== CONDITIONAL =====
+  { cat:'Conditional', name:'COUNTIF', friendly:"Counts only the rows that match a rule. Like 'how many were Electronics?'", example:'COUNTIF(Category, "Electronics")' },
+  { cat:'Conditional', name:'SUMIF',   friendly:"Adds up values, but only when a condition is met. Powerful filtered totals.", example:'SUMIF(Category, "Apparel")' },
+  { cat:'Conditional', name:'AVERAGEIF', friendly:"Average, but only the rows that pass the test. Combine with > or < for ranges.", example:'AVERAGEIF(Units Sold, ">30")' },
+  { cat:'Conditional', name:'COUNTIFS', friendly:"Like COUNTIF but with multiple rules at once. Counts rows where ALL conditions match.", example:'COUNTIFS(Category,"Electronics",Units Sold,">10")' },
+  { cat:'Conditional', name:'SUMIFS',   friendly:"SUMIF with several filters chained together. Corporate finance favorite.", example:'SUMIFS(Total Revenue,Category,"Home",Units Sold,">20")' },
+  { cat:'Conditional', name:'IF',       friendly:"Your decision-maker. If something is true, do A; otherwise do B.", example:'IF(A2>100, "High", "Low")' },
+  { cat:'Conditional', name:'IFS',      friendly:"Like IF, but for a chain of questions. Tidier than nested IFs.", example:'IFS(A2>1000,"VIP", A2>100,"Mid", TRUE,"Low")' },
+  { cat:'Conditional', name:'IFERROR',  friendly:"Wraps any formula and shows a friendly fallback when it errors out. Cleaner reports.", example:'IFERROR(VLOOKUP(...),"Not found")' },
+  { cat:'Conditional', name:'AND',      friendly:"Returns TRUE only if every condition you pass it is true.", example:'AND(A2>0, B2<10)' },
+  { cat:'Conditional', name:'OR',       friendly:"Returns TRUE if ANY of the conditions is true. The optimist function.", example:'OR(A2="VIP", B2>1000)' },
+  { cat:'Conditional', name:'NOT',      friendly:"Flips a TRUE to FALSE and vice versa. Handy with IF.", example:'NOT(A2="Closed")' },
+
+  // ===== LOOKUP =====
+  { cat:'Lookup', name:'VLOOKUP', friendly:"A search dog. Give it a name, it fetches the matching detail from another column.", example:'VLOOKUP("AeroBook 14", Product, "Total Revenue")' },
+  { cat:'Lookup', name:'HLOOKUP', friendly:"VLOOKUP's horizontal twin — searches across a row instead of down a column.", example:'HLOOKUP("AeroBook 14", Product, "Category")' },
+  { cat:'Lookup', name:'XLOOKUP', friendly:"VLOOKUP's modern cousin — searches in any direction and won't break when columns move.", example:'XLOOKUP("Pixel Lamp", Product, "Total Revenue")' },
+  { cat:'Lookup', name:'INDEX',   friendly:"Pinpoints a value at a specific row in a column. Best paired with MATCH.", example:'INDEX(Product, 7)' },
+  { cat:'Lookup', name:'MATCH',   friendly:"Tells you the position of an item in a list. The 'where is it?' partner to INDEX.", example:'MATCH("Pixel Lamp", Product)' },
+  { cat:'Lookup', name:'CHOOSE',  friendly:"Picks the Nth value from a list you give it. Mini-switch statement.", example:'CHOOSE(2,"Q1","Q2","Q3","Q4")' },
+  { cat:'Lookup', name:'OFFSET',  friendly:"Returns a cell N rows / columns away from a starting point. Powers dynamic ranges.", example:'OFFSET(A1, 5, 2)' },
+
+  // ===== TEXT =====
+  { cat:'Text', name:'CONCAT',    friendly:"Glues text together. Build a label from first 5 products with a custom separator.", example:'CONCAT(Product, " | ")' },
+  { cat:'Text', name:'TEXTJOIN',  friendly:"CONCAT on steroids — skip blanks and pick a delimiter in one shot.", example:'TEXTJOIN(", ", TRUE, Product)' },
+  { cat:'Text', name:'TEXT',      friendly:"Formats numbers/dates as readable text. Turn 1299 into '$1,299.00'.", example:'TEXT(Total Revenue, "$#,##0.00")' },
+  { cat:'Text', name:'LEFT',      friendly:"Grabs the first N characters from a string. Quick way to pull a code prefix.", example:'LEFT(Product, 4)' },
+  { cat:'Text', name:'RIGHT',     friendly:"Grabs the LAST N characters. Great for pulling a year off a date string.", example:'RIGHT(Product, 4)' },
+  { cat:'Text', name:'MID',       friendly:"Pulls characters from the middle of a string. Start position + length.", example:'MID(Product, 2, 4)' },
+  { cat:'Text', name:'LEN',       friendly:"How many characters in a string. Often used to spot data-quality issues.", example:'LEN(Product)' },
+  { cat:'Text', name:'TRIM',      friendly:"Cleans out sneaky extra spaces. The first stop on every messy import.", example:'TRIM(Product)' },
+  { cat:'Text', name:'UPPER',     friendly:"SHOUTS the text. Useful for normalizing IDs and codes.", example:'UPPER(Product)' },
+  { cat:'Text', name:'LOWER',     friendly:"Lowercases everything. Match-friendly normalization.", example:'LOWER(Product)' },
+  { cat:'Text', name:'PROPER',    friendly:"Capitalizes The First Letter Of Every Word. Names from a CSV, fixed.", example:'PROPER(Product)' },
+  { cat:'Text', name:'SUBSTITUTE',friendly:"Find-and-replace inside a single cell. Targeted, predictable.", example:'SUBSTITUTE(A2,"old","new")' },
+  { cat:'Text', name:'FIND',      friendly:"Returns the position of a character/word inside text. Case-sensitive.", example:'FIND(" ", Product)' },
+
+  // ===== ARRAY / SET =====
+  { cat:'Array', name:'UNIQUE',  friendly:"Returns the distinct entries — no duplicates. Perfect for category lists.", example:'UNIQUE(Category)' },
+  { cat:'Array', name:'SORT',    friendly:"Returns the column sorted. Numbers ascending, text alphabetical.", example:'SORT(Product)' },
+  { cat:'Array', name:'FILTER',  friendly:"Returns only the rows that match a rule. The modern way to slice data.", example:'FILTER(Product, Category="Electronics")' },
+  { cat:'Array', name:'TRANSPOSE',friendly:"Flips rows into columns and vice versa. Useful for reshaping reports.", example:'TRANSPOSE(A1:F1)' },
+
+  // ===== MATH =====
+  { cat:'Math', name:'ROUND', friendly:"Rounds to N decimals. Stop showing $1,247.8237 in your decks.", example:'ROUND(1247.8237, 2)' },
+  { cat:'Math', name:'ABS',   friendly:"Absolute value — strips the negative sign off a number.", example:'ABS(-42)' },
+  { cat:'Math', name:'INT',   friendly:"Drops the decimal part, rounding DOWN to the integer below.", example:'INT(7.9)' },
+  { cat:'Math', name:'MOD',   friendly:"The remainder after division. Slick way to flag every Nth row.", example:'MOD(10, 3)' },
+  { cat:'Math', name:'POWER', friendly:"Raise a number to a power. POWER(2,10) = 1024.", example:'POWER(2, 10)' },
+  { cat:'Math', name:'SQRT',  friendly:"Square root. Pairs nicely with VAR to get a STDEV.", example:'SQRT(144)' },
+
+  // ===== DATE =====
+  { cat:'Date', name:'TODAY', friendly:"Today's date, refreshed every time the sheet opens.", example:'TODAY()' },
+  { cat:'Date', name:'NOW',   friendly:"Current date AND time. Useful for timestamps.", example:'NOW()' },
+  { cat:'Date', name:'YEAR',  friendly:"Pulls the year out of a date.", example:'YEAR("2026-03-15")' },
+  { cat:'Date', name:'MONTH', friendly:"Pulls the month number out of a date (1–12).", example:'MONTH("2026-03-15")' },
+  { cat:'Date', name:'DAY',   friendly:"Pulls the day-of-month out of a date.", example:'DAY("2026-03-15")' },
+  { cat:'Date', name:'DATEDIF',friendly:"Counts the days/months/years between two dates. Great for tenure or aging.", example:'DATEDIF("2025-01-01", TODAY(), "M")' },
+  { cat:'Date', name:'WEEKDAY',friendly:"What day of the week is this date? 1 = Sunday by default.", example:'WEEKDAY("2026-03-15")' },
+  { cat:'Date', name:'NETWORKDAYS',friendly:"Business days between two dates — automatically skips weekends.", example:'NETWORKDAYS("2026-01-01","2026-03-31")' },
+];
+
+/* ============================================================
+   FUNCTION SYNTAX SIGNATURES (Excel-style parameter hints)
+   ============================================================ */
+const SYNTAX = {
+  SUM:'(number1, [number2], ...)',
+  AVERAGE:'(number1, [number2], ...)',
+  MIN:'(number1, [number2], ...)',
+  MAX:'(number1, [number2], ...)',
+  COUNT:'(value1, [value2], ...)',
+  COUNTA:'(value1, [value2], ...)',
+  PRODUCT:'(number1, [number2], ...)',
+  MEDIAN:'(number1, [number2], ...)',
+  STDEV:'(number1, [number2], ...)',
+  VAR:'(number1, [number2], ...)',
+  LARGE:'(array, k)',
+  SMALL:'(array, k)',
+  RANK:'(number, ref, [order])',
+  COUNTIF:'(range, criteria)',
+  SUMIF:'(range, criteria, [sum_range])',
+  AVERAGEIF:'(range, criteria, [average_range])',
+  COUNTIFS:'(range1, criteria1, [range2, criteria2], ...)',
+  SUMIFS:'(sum_range, criteria_range1, criteria1, ...)',
+  IF:'(logical_test, value_if_true, [value_if_false])',
+  IFS:'(logical_test1, value1, [logical_test2, value2], ...)',
+  IFERROR:'(value, value_if_error)',
+  AND:'(logical1, [logical2], ...)',
+  OR:'(logical1, [logical2], ...)',
+  NOT:'(logical)',
+  VLOOKUP:'(lookup_value, table_array, col_index, [range_lookup])',
+  HLOOKUP:'(lookup_value, table_array, row_index, [range_lookup])',
+  XLOOKUP:'(lookup_value, lookup_array, return_array, [if_not_found])',
+  INDEX:'(array, row_num, [col_num])',
+  MATCH:'(lookup_value, lookup_array, [match_type])',
+  CHOOSE:'(index_num, value1, [value2], ...)',
+  OFFSET:'(reference, rows, cols, [height], [width])',
+  CONCAT:'(text1, [text2], ...)',
+  TEXTJOIN:'(delimiter, ignore_empty, text1, [text2], ...)',
+  TEXT:'(value, format_text)',
+  LEFT:'(text, [num_chars])',
+  RIGHT:'(text, [num_chars])',
+  MID:'(text, start_num, num_chars)',
+  LEN:'(text)',
+  TRIM:'(text)',
+  UPPER:'(text)',
+  LOWER:'(text)',
+  PROPER:'(text)',
+  SUBSTITUTE:'(text, old_text, new_text, [instance_num])',
+  FIND:'(find_text, within_text, [start_num])',
+  UNIQUE:'(array, [by_col], [exactly_once])',
+  SORT:'(array, [sort_index], [sort_order], [by_col])',
+  FILTER:'(array, include, [if_empty])',
+  TRANSPOSE:'(array)',
+  ROUND:'(number, num_digits)',
+  ABS:'(number)',
+  INT:'(number)',
+  MOD:'(number, divisor)',
+  POWER:'(number, power)',
+  SQRT:'(number)',
+  TODAY:'()',
+  NOW:'()',
+  YEAR:'(serial_number)',
+  MONTH:'(serial_number)',
+  DAY:'(serial_number)',
+  DATEDIF:'(start_date, end_date, unit)',
+  WEEKDAY:'(serial_number, [return_type])',
+  NETWORKDAYS:'(start_date, end_date, [holidays])',
+};
+
+const FN_CATS = ['All','Aggregate','Conditional','Lookup','Text','Array','Math','Date'];
+let activeFnCat = 'All';
+
+function renderFunctionCats(){
+  const wrap = document.getElementById('fnCats');
+  wrap.innerHTML = FN_CATS.map(c => {
+    const count = c==='All' ? LIBRARY.length : LIBRARY.filter(x=>x.cat===c).length;
+    const active = c === activeFnCat;
+    return `<button data-cat="${c}" class="cat-chip text-[11.5px] mono px-2.5 py-1 rounded-full border transition ${active
+      ? 'bg-accent-600 border-accent-600 text-white'
+      : 'border-ink-200 dark:border-ink-800 text-ink-600 dark:text-ink-300 hover:border-ink-300 dark:hover:border-ink-700'}">${c} <span class="${active?'text-white/70':'text-ink-400'}">· ${count}</span></button>`;
+  }).join('');
+  wrap.querySelectorAll('.cat-chip').forEach(b => b.addEventListener('click', () => {
+    activeFnCat = b.dataset.cat;
+    renderFunctionCats();
+    renderFunctions(document.getElementById('fnSearch').value);
+  }));
+}
+
+function renderFunctions(filter=''){
+  const grid = document.getElementById('fnGrid');
+  const f = filter.trim().toLowerCase();
+  const matched = LIBRARY.filter(x =>
+    (activeFnCat==='All' || x.cat===activeFnCat) &&
+    (!f || x.name.toLowerCase().includes(f) || x.friendly.toLowerCase().includes(f) || x.example.toLowerCase().includes(f))
+  );
+  if (!matched.length){
+    grid.innerHTML = `<div class="md:col-span-2 xl:col-span-3 rounded-2xl border border-dashed border-ink-300 dark:border-ink-700 p-8 text-center text-ink-500 dark:text-ink-400 text-[13px]">No matches. Try a shorter search or a different category.</div>`;
+    return;
+  }
+  grid.innerHTML = matched.map(x => {
+    const sig = SYNTAX[x.name] || '(...)';
+    // Parse sig into parts: wrap [optional] in muted color, highlight commas
+    const sigHtml = sig
+      .replace(/\[([^\]]+)\]/g, '<span class="text-ink-400 dark:text-ink-500">[$1]</span>')
+      .replace(/\.\.\./g, '<span class="text-ink-400 dark:text-ink-500">...</span>');
+    return `
+    <article class="rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 p-4 hover:border-accent-500/50 dark:hover:border-accent-500/40 transition group">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0">
+          <div class="mono text-[10px] tracking-[0.16em] uppercase text-accent-700 dark:text-accent-400 font-semibold">${x.cat}</div>
+          <h3 class="text-[15px] font-semibold mono mt-0.5 leading-tight">${x.name}<span class="text-[13px] font-normal text-ink-500 dark:text-ink-400">${sigHtml}</span></h3>
+        </div>
+        <button class="try-fx shrink-0 text-[11px] mono px-2 py-1 rounded-md border border-ink-200 dark:border-ink-800 hover:bg-accent-600 hover:text-white hover:border-accent-600 transition" data-formula='${x.example.replace(/'/g,"&#39;")}'>Try it →</button>
+      </div>
+      <p class="text-[13px] text-ink-600 dark:text-ink-300 mt-2.5 leading-relaxed">${x.friendly}</p>
+      <div class="mt-3 flex items-center gap-1.5">
+        <span class="text-[10px] uppercase tracking-[0.12em] text-ink-400 dark:text-ink-500 font-semibold">Example</span>
+        <div class="flex-1 h-px bg-ink-100 dark:bg-ink-800"></div>
+      </div>
+      <div class="mt-1.5 mono text-[12px] text-ink-500 dark:text-ink-400 bg-ink-50 dark:bg-ink-950/60 border border-ink-200 dark:border-ink-800 rounded-md px-2.5 py-2">
+        <span class="text-accent-600 dark:text-accent-400">=</span> ${x.example}
+      </div>
+    </article>`;
+  }).join('');
+
+  grid.querySelectorAll('.try-fx').forEach(b => {
+    b.addEventListener('click', () => {
+      formulaInput.value = b.dataset.formula;
+      setView('playground');
+      formulaInput.focus();
+      // only run if our parser supports it (some examples are illustrative)
+      const p = parseFormula(formulaInput.value);
+      if (p.ok && FUNCS[p.fn]) run();
+      else {
+        resultValue.textContent = '—';
+        resultValue.className = 'mt-1 text-[28px] font-semibold mono leading-tight text-ink-400';
+        resultMeta.textContent = `Loaded ${p.fn || 'formula'} into the bar — this one's reference-only in the sandbox.`;
+        resultMeta.className = 'text-[12px] text-ink-500 dark:text-ink-400 mt-1';
+        parseTrace.innerHTML = `<div><span class="text-ink-400">▸</span> example loaded for reading</div>`;
+      }
+    });
+  });
+}
+document.getElementById('fnSearch').addEventListener('input', e => renderFunctions(e.target.value));
+
+/* ============================================================
+   FEATURES — cards + live demos (Pivot + Conditional Formatting)
+   ============================================================ */
+const FEATURES = [
+  {
+    icon:'▦', name:'Pivot Tables',
+    headline:"The fastest way to summarize a big sheet without writing one formula.",
+    body:"Drag a column into ROWS, another into VALUES, pick an aggregation (SUM, AVG, COUNT) — Excel rebuilds the report in real time. Filter with the SLICER pane to make it interactive.",
+    where:"Insert ▸ PivotTable",
+    pro:"Right-click a value cell → ‘Show Values As ▸ % of Grand Total’ for instant share-of-revenue breakdowns."
+  },
+  {
+    icon:'◉', name:'Data Validation',
+    headline:"Stop bad data from ever entering the sheet.",
+    body:"Restrict a cell to a list (dropdown), a number range, a date, or a custom formula. Pair it with an input message and an error alert so collaborators know the rules.",
+    where:"Data ▸ Data Validation",
+    pro:"Use a List source pointing at a named range so the dropdown updates automatically when you add new options."
+  },
+  {
+    icon:'◐', name:'Conditional Formatting',
+    headline:"Make numbers tell their own story with color.",
+    body:"Heat maps, data bars, top/bottom rules, and formula-driven rules. The formula option (=A2>AVERAGE($A$2:$A$100)) is where this becomes a superpower.",
+    where:"Home ▸ Conditional Formatting",
+    pro:"Always anchor your range with $ when writing formula rules — otherwise Excel slides the reference and your highlights drift."
+  },
+  {
+    icon:'⊞', name:'Excel Tables',
+    headline:"Convert a range into a real Table and everything gets smarter.",
+    body:"Auto-expanding ranges, structured references (=Table1[Revenue]), banded rows, and built-in filter dropdowns. Charts and Pivots that point at a Table grow with it automatically.",
+    where:"Insert ▸ Table  ·  Ctrl + T",
+    pro:"Name your table on the Table Design tab — your formulas become self-documenting (=SUM(Sales[Total]))."
+  },
+  {
+    icon:'⟳', name:'Power Query',
+    headline:"Repeatable data cleanup. Record once, refresh forever.",
+    body:"Import from CSV/SQL/web, then build a recipe of steps: split columns, unpivot, merge tables, change types. Hit Refresh later and Power Query re-runs the entire pipeline on the new data.",
+    where:"Data ▸ Get & Transform",
+    pro:"After you publish your query, click ‘Close & Load To’ → Connection Only, then load it into a Pivot Cache for huge datasets."
+  },
+  {
+    icon:'△', name:'Power Pivot & DAX',
+    headline:"When your dataset is too big for one sheet, you need a model.",
+    body:"Connect millions of rows from multiple tables, define relationships (like a tiny database), and write DAX measures (SUMX, CALCULATE, FILTER) for advanced analytics.",
+    where:"Power Pivot tab (enable in Add-Ins)",
+    pro:"Always build measures on the model — never hard-code totals in cells. Measures stay correct as filters change."
+  },
+  {
+    icon:'≡', name:'Sort & Filter',
+    headline:"The bread-and-butter of every analyst's workflow.",
+    body:"AutoFilter dropdowns on every header. Multi-level sort (sort by Category, then by Revenue descending). Use the Filter view to slice without messing up the underlying data.",
+    where:"Data ▸ Filter  ·  Ctrl + Shift + L",
+    pro:"Hold Ctrl and click multiple values in a filter dropdown to do quick OR-filters."
+  },
+  {
+    icon:'⏏', name:'Remove Duplicates',
+    headline:"Clean a list in two clicks.",
+    body:"Pick the columns that define 'unique' (e.g. Email + Phone) and Excel deletes the duplicates and tells you how many it removed. Always copy your data first — this one's destructive.",
+    where:"Data ▸ Remove Duplicates",
+    pro:"Pair with Conditional Formatting → Highlight Duplicates first to preview what'll get removed."
+  },
+  {
+    icon:'⤓', name:'Text to Columns',
+    headline:"Split one column into several based on a delimiter.",
+    body:"'Smith, John' → 'Smith' | 'John' in one go. Choose comma, tab, space, or fixed-width. Most useful right after a CSV paste that didn't parse cleanly.",
+    where:"Data ▸ Text to Columns",
+    pro:"For modern Excel, prefer the new TEXTSPLIT() function — same idea, fully formula-driven, updates as data changes."
+  },
+  {
+    icon:'❄', name:'Freeze Panes',
+    headline:"Scroll a long sheet without losing your headers.",
+    body:"Freeze the top row, the first column, or both. The frozen rows/cols stay locked while you scroll the rest. Tiny feature, massive day-to-day value.",
+    where:"View ▸ Freeze Panes",
+    pro:"Click the cell BELOW and to the RIGHT of what you want frozen, then ‘Freeze Panes’ — that's the secret of the menu."
+  },
+  {
+    icon:'◇', name:'Named Ranges',
+    headline:"Replace cryptic A2:A100 with a meaningful name.",
+    body:"Select a range → type a name in the Name Box. Now =SUM(Sales) reads the way humans think. Combine with INDIRECT() for dynamic dashboards.",
+    where:"Formulas ▸ Name Manager",
+    pro:"Use OFFSET in a named range definition to make it auto-expand as new rows are added."
+  },
+  {
+    icon:'◍', name:'Charts & Sparklines',
+    headline:"From a column of numbers to a story-ready visual.",
+    body:"Bar, line, scatter for analysis; pie for shares (sparingly). Sparklines tuck a tiny chart into a single cell — perfect for dashboards. Combo charts overlay two scales.",
+    where:"Insert ▸ Chart  ·  Insert ▸ Sparklines",
+    pro:"Right-click a chart → ‘Save as Template’ to reuse your styling across decks without redoing every formatting tweak."
+  },
+  {
+    icon:'⌖', name:'Goal Seek & Solver',
+    headline:"Reverse-engineer a formula. Set the answer, ask Excel for the input.",
+    body:"Goal Seek changes one cell to make a formula equal a target. Solver does the same with multiple variables and constraints — useful for budgeting and what-if analysis.",
+    where:"Data ▸ What-If Analysis",
+    pro:"Lock your assumptions in named cells before running Goal Seek — you'll have a paper trail of what changed."
+  },
+  {
+    icon:'⊠', name:'Protect Sheet & Range',
+    headline:"Share with finance without fearing accidental edits.",
+    body:"Lock specific cells, leave inputs editable. Add a password if needed. Combine with hidden formulas so collaborators can use the model without seeing the IP.",
+    where:"Review ▸ Protect Sheet",
+    pro:"Unlock your input cells FIRST (Format Cells → Protection → uncheck Locked), THEN protect the sheet. Otherwise everything is locked."
+  },
+];
+
+function renderFeatures(){
+  const grid = document.getElementById('featureGrid');
+
+  // Build pivot before/after HTML inline for the Pivot Table card
+  const pivotBeforeRows = DATA.slice(0,5);
+  const beforeTable = `
+    <div class="overflow-auto nice-scroll rounded-lg border border-ink-200 dark:border-ink-800">
+      <table class="sheet text-[11px] mono w-full">
+        <thead><tr><th>Date</th><th>Product</th><th>Category</th><th class="text-right">Units</th><th class="text-right">Revenue</th></tr></thead>
+        <tbody>
+          ${pivotBeforeRows.map(r=>`<tr>
+            <td>${r.Date}</td>
+            <td>${r.Product}</td>
+            <td>${r.Category}</td>
+            <td class="text-right">${r['Units Sold']}</td>
+            <td class="text-right">$${r['Total Revenue'].toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+          </tr>`).join('')}
+          <tr><td colspan="5" class="text-center text-ink-400">… 19 more rows</td></tr>
+        </tbody>
+      </table>
+    </div>`;
+
+  // Aggregate by category for the "after" pivot
+  const cats = {};
+  DATA.forEach(r=>{ if(!cats[r.Category]) cats[r.Category]={rows:0,rev:0,units:0}; cats[r.Category].rows++; cats[r.Category].rev+=r['Total Revenue']; cats[r.Category].units+=r['Units Sold']; });
+  const afterTable = `
+    <div class="overflow-auto nice-scroll rounded-lg border border-accent-500/30 dark:border-accent-500/20">
+      <table class="sheet text-[11px] mono w-full">
+        <thead><tr><th>Category</th><th class="text-right">SUM Revenue</th><th class="text-right">SUM Units</th><th class="text-right">Rows</th></tr></thead>
+        <tbody>
+          ${Object.entries(cats).sort((a,b)=>b[1].rev-a[1].rev).map(([k,v])=>`<tr>
+            <td>${k}</td>
+            <td class="text-right">$${v.rev.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+            <td class="text-right">${v.units}</td>
+            <td class="text-right text-ink-500">${v.rows}</td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot><tr class="font-semibold">
+          <td>Grand Total</td>
+          <td class="text-right">$${DATA.reduce((a,r)=>a+r['Total Revenue'],0).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+          <td class="text-right">${DATA.reduce((a,r)=>a+r['Units Sold'],0)}</td>
+          <td class="text-right text-ink-500">${DATA.length}</td>
+        </tr></tfoot>
+      </table>
+    </div>`;
+
+  const pivotViz = `
+    <div class="mt-4 border-t border-ink-200 dark:border-ink-800 pt-4">
+      <div class="text-[10px] uppercase tracking-[0.14em] text-ink-400 font-semibold mb-3">Before &amp; After</div>
+      <div class="grid grid-cols-1 sm:grid-cols-[1fr,auto,1fr] gap-3 items-start">
+        <div>
+          <div class="text-[10px] mono text-ink-400 mb-1">Flat data (24 rows)</div>
+          ${beforeTable}
+        </div>
+        <div class="hidden sm:flex items-center self-center text-accent-600 dark:text-accent-400 text-[22px] font-light pt-6">→</div>
+        <div>
+          <div class="text-[10px] mono text-accent-700 dark:text-accent-400 mb-1">Pivot by Category</div>
+          ${afterTable}
+        </div>
+      </div>
+    </div>`;
+
+  grid.innerHTML = FEATURES.map((f,i) => `
+    <article class="rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 p-5 hover:border-accent-500/50 dark:hover:border-accent-500/40 transition">
+      <div class="flex items-start gap-3">
+        <div class="w-10 h-10 shrink-0 rounded-xl grid place-items-center bg-accent-600/10 text-accent-700 dark:text-accent-400 text-[18px] font-semibold">${f.icon}</div>
+        <div class="min-w-0">
+          <h3 class="text-[15px] font-semibold leading-tight">${f.name}</h3>
+          <p class="text-[12.5px] text-ink-500 dark:text-ink-400 mt-1 leading-snug">${f.headline}</p>
+        </div>
+      </div>
+      <p class="text-[13px] text-ink-600 dark:text-ink-300 mt-3 leading-relaxed">${f.body}</p>
+      <div class="mt-3 flex items-center gap-2 text-[11px]">
+        <span class="kbd">${f.where}</span>
+      </div>
+      <div class="mt-3 rounded-lg border border-accent-600/20 bg-accent-600/5 dark:bg-accent-500/5 p-3">
+        <div class="text-[10px] uppercase tracking-[0.14em] text-accent-700 dark:text-accent-400 font-semibold mono">Pro tip</div>
+        <p class="text-[12.5px] text-ink-700 dark:text-ink-200 mt-1 leading-relaxed">${f.pro}</p>
+      </div>
+      ${f.name === 'Pivot Tables' ? pivotViz : ''}
+    </article>
+  `).join('');
+}
+
+/* ----- Pivot Table demo ----- */
+let pivotAgg = 'SUM';
+function renderPivot(){
+  const rowField = document.getElementById('pivotRow').value;
+  const valField = document.getElementById('pivotVal').value;
+  const groups = {};
+  DATA.forEach(r => {
+    const k = r[rowField];
+    if (!(k in groups)) groups[k] = [];
+    groups[k].push(Number(r[valField])||0);
+  });
+  const agg = (arr) => {
+    if (pivotAgg === 'SUM')   return arr.reduce((a,b)=>a+b,0);
+    if (pivotAgg === 'AVERAGE') return arr.reduce((a,b)=>a+b,0)/arr.length;
+    if (pivotAgg === 'COUNT') return arr.length;
+    if (pivotAgg === 'MAX')   return Math.max(...arr);
+    return 0;
+  };
+  const rows = Object.keys(groups).sort().map(k => ({ key:k, val:agg(groups[k]), n:groups[k].length }));
+  const grand = agg(DATA.map(r => Number(r[valField])||0));
+  const fmt = (n) => (valField === 'Units Sold' && pivotAgg !== 'AVERAGE')
+    ? Math.round(n).toLocaleString()
+    : '$' + n.toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2});
+  const numericResult = (pivotAgg === 'COUNT');
+
+  document.getElementById('pivotHead').innerHTML =
+    `<th>${rowField}</th><th class="text-right">${pivotAgg} of ${valField}</th><th class="text-right">Rows</th>`;
+  document.getElementById('pivotBody').innerHTML = rows.map(r =>
+    `<tr><td>${r.key}</td><td class="text-right">${numericResult ? r.val.toLocaleString() : fmt(r.val)}</td><td class="text-right text-ink-500">${r.n}</td></tr>`
+  ).join('');
+  document.getElementById('pivotFoot').innerHTML =
+    `<tr class="font-semibold"><td>Grand Total</td><td class="text-right">${pivotAgg==='COUNT' ? DATA.length.toLocaleString() : fmt(grand)}</td><td class="text-right text-ink-500">${DATA.length}</td></tr>`;
+}
+function wirePivot(){
+  document.getElementById('pivotRow').addEventListener('change', renderPivot);
+  document.getElementById('pivotVal').addEventListener('change', renderPivot);
+  document.querySelectorAll('.agg-tab').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.agg-tab').forEach(x => {
+      x.classList.remove('tab-active');
+      x.classList.add('text-ink-500','dark:text-ink-400');
+    });
+    b.classList.add('tab-active');
+    b.classList.remove('text-ink-500','dark:text-ink-400');
+    pivotAgg = b.dataset.agg;
+    renderPivot();
+  }));
+}
+
+/* ----- Conditional Formatting demo ----- */
+let cfRule = 'heat';
+function renderCF(){
+  const tbl = document.getElementById('cfSheet');
+  const head = '<thead><tr><th class="col-corner"></th>' + COLUMNS.map((c,i) =>
+    `<th>${String.fromCharCode(65+i)} · ${c}</th>`).join('') + '</tr></thead>';
+
+  // pre-compute stats for the active rule on the Total Revenue column
+  const rev = DATA.map(r => r['Total Revenue']);
+  const minR = Math.min(...rev), maxR = Math.max(...rev);
+  const avgR = rev.reduce((a,b)=>a+b,0)/rev.length;
+  const top3 = [...rev].sort((a,b)=>b-a).slice(0,3);
+
+  const body = '<tbody>' + DATA.map((row, idx) => {
+    const cells = COLUMNS.map(c => {
+      let v = row[c];
+      let style = '';
+      let extra = '';
+      if (c === 'Total Revenue'){
+        const num = row[c];
+        if (cfRule === 'heat'){
+          // gradient red→yellow→green based on rank
+          const t = (num - minR) / (maxR - minR || 1); // 0..1
+          // hue: red(0) → green(120)
+          const h = Math.round(t * 120);
+          style = `background:hsl(${h} 70% 88%); color:hsl(${h} 60% 22%);`;
+        } else if (cfRule === 'bars'){
+          const t = (num - minR) / (maxR - minR || 1);
+          const w = Math.max(4, Math.round(t * 100));
+          extra = `<div style="position:absolute;inset:0;background:linear-gradient(to right, rgba(63,199,126,.35) ${w}%, transparent ${w}%);"></div>`;
+          style = 'position:relative;';
+        } else if (cfRule === 'top3'){
+          if (top3.includes(num)) style = 'background:rgba(63,199,126,.2); color:#157a47; font-weight:600;';
+        } else if (cfRule === 'above'){
+          if (num > avgR) style = 'background:rgba(63,199,126,.18); color:#157a47;';
+          else            style = 'background:rgba(244,63,94,.10); color:#9f1239;';
+        }
+      }
+      if (c === 'Unit Price' || c === 'Total Revenue') v = '$' + v.toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2});
+      const align = NUMERIC.has(c) ? 'text-right' : '';
+      return `<td class="${align}" style="${style}">${extra}<span style="position:relative;">${v}</span></td>`;
+    }).join('');
+    return `<tr><td class="row-num">${idx+2}</td>${cells}</tr>`;
+  }).join('') + '</tbody>';
+
+  tbl.innerHTML = head + body;
+}
+function wireCF(){
+  document.querySelectorAll('.cf-tab').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.cf-tab').forEach(x => {
+      x.classList.remove('tab-active');
+      x.classList.add('text-ink-500','dark:text-ink-400');
+    });
+    b.classList.add('tab-active');
+    b.classList.remove('text-ink-500','dark:text-ink-400');
+    cfRule = b.dataset.rule;
+    renderCF();
+  }));
+}
+
+/* ============================================================
+   SHORTCUTS
+   ============================================================ */
+const SHORTCUTS = [
+  { group:'Navigation', items:[
+    { name:'Jump to data edge',         friendly:"Race to the end of a column or row in one tap.",                win:'Ctrl + Arrow',     mac:'⌘ + Arrow' },
+    { name:'Select to data edge',       friendly:"Same jump, but select everything along the way.",                win:'Ctrl + Shift + Arrow', mac:'⌘ + Shift + Arrow' },
+    { name:'Go to specific cell',       friendly:"Open the 'Go To' box and beam yourself anywhere.",               win:'Ctrl + G',         mac:'⌃ + G' },
+    { name:'Switch worksheets',         friendly:"Cycle to the next sheet without touching the mouse.",            win:'Ctrl + Page Down', mac:'⌥ + → ' },
+  ]},
+  { group:'Data entry', items:[
+    { name:'Auto-sum',                  friendly:"Excel writes the SUM for you. Saves a thousand keystrokes.",     win:'Alt + =',          mac:'⌘ + Shift + T' },
+    { name:'Flash Fill',                friendly:"Show a couple examples; Excel finishes the pattern.",            win:'Ctrl + E',         mac:'⌃ + E' },
+    { name:'Fill down',                 friendly:"Copies the cell above into the selection — instantly.",          win:'Ctrl + D',         mac:'⌘ + D' },
+    { name:'New line in cell',          friendly:"Stack text inside one cell instead of bleeding across rows.",    win:'Alt + Enter',      mac:'⌃ + ⌥ + Enter' },
+    { name:'Today\'s date',             friendly:"Stamp today\'s date without typing it.",                          win:'Ctrl + ;',         mac:'⌃ + ;' },
+  ]},
+  { group:'Formatting', items:[
+    { name:'Format cells dialog',       friendly:"Opens the Swiss-army knife of cell formatting.",                 win:'Ctrl + 1',         mac:'⌘ + 1' },
+    { name:'Currency format',           friendly:"Turn raw numbers into money on the spot.",                       win:'Ctrl + Shift + $', mac:'⌃ + Shift + $' },
+    { name:'Percent format',            friendly:"0.42 → 42% in one shortcut.",                                     win:'Ctrl + Shift + %', mac:'⌃ + Shift + %' },
+    { name:'Bold / Italic / Underline', friendly:"The classic trio for making something pop.",                     win:'Ctrl + B / I / U', mac:'⌘ + B / I / U' },
+  ]},
+  { group:'Power moves', items:[
+    { name:'Insert Table',              friendly:"Wraps your range in a real Table — auto-headers, banded rows.",  win:'Ctrl + T',         mac:'⌃ + T' },
+    { name:'Filter on/off',             friendly:"Toggle filter dropdowns on every header.",                       win:'Ctrl + Shift + L', mac:'⌘ + Shift + F' },
+    { name:'Insert chart',              friendly:"Highlight some data and birth a chart.",                         win:'Alt + F1',         mac:'fn + F1' },
+    { name:'Find & Replace',            friendly:"The classic search dialog. Indispensable.",                      win:'Ctrl + H',         mac:'⌃ + H' },
+    { name:'Undo / Redo',               friendly:"Time travel. Use generously.",                                    win:'Ctrl + Z / Y',     mac:'⌘ + Z / ⇧⌘Z' },
+  ]},
+];
+
+let currentOS = 'win';
+function renderShortcuts(){
+  const grid = document.getElementById('scGrid');
+  grid.innerHTML = SHORTCUTS.map(g => `
+    <section class="rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 overflow-hidden">
+      <header class="px-4 py-3 border-b border-ink-200 dark:border-ink-800 flex items-center justify-between">
+        <h3 class="text-[13px] font-semibold">${g.group}</h3>
+        <span class="text-[10px] mono uppercase tracking-[0.14em] text-ink-400">${g.items.length} moves</span>
+      </header>
+      <ul class="divide-y divide-ink-200 dark:divide-ink-800">
+        ${g.items.map(it => `
+          <li class="px-4 py-3 flex items-start justify-between gap-3 hover:bg-ink-50 dark:hover:bg-ink-800/40 transition">
+            <div class="min-w-0">
+              <div class="text-[13px] font-medium">${it.name}</div>
+              <div class="text-[12px] text-ink-500 dark:text-ink-400 mt-0.5 leading-snug">${it.friendly}</div>
+            </div>
+            <div class="shrink-0 flex flex-wrap justify-end gap-1.5 max-w-[200px]">
+              ${(currentOS==='win'?it.win:it.mac).split(/\s*\+\s*/).map(k => `<span class="kbd">${k}</span>`).join('<span class="text-ink-400 text-[11px] self-center">+</span>')}
+            </div>
+          </li>
+        `).join('')}
+      </ul>
+    </section>
+  `).join('');
+}
+
+document.querySelectorAll('.os-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.os-tab').forEach(b => {
+      b.classList.remove('tab-active');
+      b.classList.add('text-ink-500','dark:text-ink-400');
+    });
+    btn.classList.add('tab-active');
+    btn.classList.remove('text-ink-500','dark:text-ink-400');
+    currentOS = btn.dataset.os;
+    renderShortcuts();
+  });
+});
+
+/* ============================================================
+   VIEW SWITCHING
+   ============================================================ */
+function setView(name){
+  document.querySelectorAll('[data-view-panel]').forEach(p => {
+    p.classList.toggle('hidden', p.dataset.viewPanel !== name);
+  });
+  document.querySelectorAll('.view-tab').forEach(t => {
+    const active = t.dataset.view === name;
+    t.classList.toggle('tab-active', active);
+    t.classList.toggle('text-ink-500', !active);
+    t.classList.toggle('dark:text-ink-400', !active);
+  });
+}
+document.querySelectorAll('.view-tab').forEach(t => {
+  t.addEventListener('click', () => setView(t.dataset.view));
+});
+
+/* ============================================================
+   THEME
+   ============================================================ */
+const themeBtn = document.getElementById('themeToggle');
+function applyTheme(t){
+  document.documentElement.classList.toggle('dark', t === 'dark');
+  localStorage.setItem('mlab-theme', t);
+}
+themeBtn.addEventListener('click', () => {
+  applyTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark');
+});
+applyTheme(localStorage.getItem('mlab-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+renderSheet();
+renderFunctionCats();
+renderFunctions();
+renderShortcuts();
+renderFeatures();
+renderPivot();
+wirePivot();
+renderCF();
+wireCF();
+run();
+</script>
+</body>
+</html>
